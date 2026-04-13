@@ -59,6 +59,8 @@ export function assertValidShellApiFunctionName(functionName: string): void {
   }
 }
 
+const VALID_PLUGIN_NAME_RE = /^dbgate-plugin-[a-zA-Z0-9_-]+$/;
+
 export function extractShellApiPlugins(functionName, props): string[] {
   const res = [];
   const nsMatch = functionName.match(/^([^@]+)@([^@]+)/);
@@ -69,6 +71,11 @@ export function extractShellApiPlugins(functionName, props): string[] {
     const nsMatchEngine = props.connection.engine.match(/^([^@]+)@([^@]+)/);
     if (nsMatchEngine) {
       res.push(nsMatchEngine[2]);
+    }
+  }
+  for (const plugin of res) {
+    if (!VALID_PLUGIN_NAME_RE.test(plugin)) {
+      throw new Error(`DBGM-00000 Invalid plugin name: ${String(plugin).substring(0, 100)}`);
     }
   }
   return res;

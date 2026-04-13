@@ -17,9 +17,15 @@ function unzipDirectory(zipPath, outputDirectory) {
     yauzl.open(zipPath, { lazyEntries: true }, (err, zipFile) => {
       if (err) return reject(err);
       let settled = false;
+      /** Track active streams so we can destroy them on early abort */
+      const activeStreams = new Set();
       const safeReject = rejectErr => {
         if (settled) return;
         settled = true;
+        for (const s of activeStreams) {
+          s.destroy();
+        }
+        activeStreams.clear();
         zipFile.close();
         reject(rejectErr);
       };
@@ -53,7 +59,9 @@ function unzipDirectory(zipPath, outputDirectory) {
           // Ensure directory exists, then continue to next entry
           fs.promises
             .mkdir(destPath, { recursive: true })
-            .then(() => zipFile.readEntry())
+            .then(() => {
+              if (!settled) zipFile.readEntry();
+            })
             .catch(safeReject);
           return;
         }
@@ -68,17 +76,24 @@ function unzipDirectory(zipPath, outputDirectory) {
                   if (err) return rej(err);
 
                   const writeStream = fs.createWriteStream(destPath);
+                  activeStreams.add(readStream);
+                  activeStreams.add(writeStream);
                   readStream.pipe(writeStream);
 
-                  // proceed to next entry once we’ve consumed *this* one
-                  readStream.on('end', () => zipFile.readEntry());
+                  // proceed to next entry once we've consumed *this* one
+                  readStream.on('end', () => {
+                    activeStreams.delete(readStream);
+                    if (!settled) zipFile.readEntry();
+                  });
 
                   writeStream.on('finish', () => {
+                    activeStreams.delete(writeStream);
                     logger.info(`DBGM-00068 Extracted "${entry.fileName}" → "${destPath}".`);
                     res();
                   });
 
                   writeStream.on('error', writeErr => {
+                    activeStreams.delete(writeStream);
                     logger.error(
                       extractErrorLogData(writeErr),
                       `DBGM-00069 Error extracting "${entry.fileName}" from "${zipPath}".`
@@ -99,6 +114,7 @@ function unzipDirectory(zipPath, outputDirectory) {
           .then(() => {
             if (settled) return;
             settled = true;
+            zipFile.close();
             logger.info(`DBGM-00070 Archive "${zipPath}" fully extracted to "${outputDirectory}".`);
             resolve(true);
           })
