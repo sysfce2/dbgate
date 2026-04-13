@@ -16,7 +16,13 @@ function unzipDirectory(zipPath, outputDirectory) {
   return new Promise((resolve, reject) => {
     yauzl.open(zipPath, { lazyEntries: true }, (err, zipFile) => {
       if (err) return reject(err);
-
+      let settled = false;
+      const safeReject = rejectErr => {
+        if (settled) return;
+        settled = true;
+        zipFile.close();
+        reject(rejectErr);
+      };
       /** Pending per-file extractions – we resolve the main promise after they’re all done */
       const pending = [];
 
@@ -29,7 +35,7 @@ function unzipDirectory(zipPath, outputDirectory) {
       zipFile.on('entry', entry => {
         // Null-byte poison check
         if (entry.fileName.includes('\0')) {
-          return reject(new Error(`DBGM-00000 ZIP entry with null byte in filename rejected`));
+          return safeReject(new Error(`DBGM-00000 ZIP entry with null byte in filename rejected`));
         }
 
         const destPath = path.join(outputDirectory, entry.fileName);
@@ -37,7 +43,7 @@ function unzipDirectory(zipPath, outputDirectory) {
 
         // Zip-slip protection: every extracted path must stay inside outputDirectory
         if (resolvedDest !== resolvedOutputDir && !resolvedDest.startsWith(resolvedOutputDir + path.sep)) {
-          return reject(
+          return safeReject(
             new Error(`DBGM-00000 ZIP slip detected: entry "${entry.fileName}" would escape output directory`)
           );
         }
@@ -48,7 +54,7 @@ function unzipDirectory(zipPath, outputDirectory) {
           fs.promises
             .mkdir(destPath, { recursive: true })
             .then(() => zipFile.readEntry())
-            .catch(reject);
+            .catch(safeReject);
           return;
         }
 
@@ -88,17 +94,20 @@ function unzipDirectory(zipPath, outputDirectory) {
 
       // Entire archive enumerated; wait for all streams to finish
       zipFile.on('end', () => {
+        if (settled) return;
         Promise.all(pending)
           .then(() => {
+            if (settled) return;
+            settled = true;
             logger.info(`DBGM-00070 Archive "${zipPath}" fully extracted to "${outputDirectory}".`);
             resolve(true);
           })
-          .catch(reject);
+          .catch(safeReject);
       });
 
       zipFile.on('error', err => {
         logger.error(extractErrorLogData(err), `DBGM-00071 ZIP file error in ${zipPath}.`);
-        reject(err);
+        safeReject(err);
       });
     });
   });
