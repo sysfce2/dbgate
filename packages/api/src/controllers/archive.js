@@ -62,6 +62,9 @@ module.exports = {
 
   createLink_meta: true,
   async createLink({ linkedFolder }) {
+    if ( typeof linkedFolder !== 'string' || linkedFolder.length === 0) {
+      throw new Error(`DBGM-00000 Invalid linkedFolder: must be a non-empty string`);
+    }
     assertSafeArchiveName(path.parse(linkedFolder).name, 'linkedFolder');
     const folder = await this.getNewArchiveFolder({ database: path.parse(linkedFolder).name + '.link' });
     await fs.writeFile(path.join(archivedir(), folder), linkedFolder);
