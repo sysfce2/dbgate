@@ -86,6 +86,11 @@ function unzipDirectory(zipPath, outputDirectory) {
                     if (!settled) zipFile.readEntry();
                   });
 
+                  readStream.on('error', readErr => {
+                    activeStreams.delete(readStream);
+                    rej(readErr);
+                  });
+
                   writeStream.on('finish', () => {
                     activeStreams.delete(writeStream);
                     logger.info(`DBGM-00068 Extracted "${entry.fileName}" → "${destPath}".`);
@@ -104,6 +109,9 @@ function unzipDirectory(zipPath, outputDirectory) {
               })
           );
 
+        // Immediately abort the whole unzip if this file fails; otherwise the
+        // zip would never emit 'end' (lazyEntries won't advance without readEntry).
+        filePromise.catch(safeReject);
         pending.push(filePromise);
       });
 
