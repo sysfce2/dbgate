@@ -20,11 +20,27 @@ function unzipDirectory(zipPath, outputDirectory) {
       /** Pending per-file extractions – we resolve the main promise after they’re all done */
       const pending = [];
 
+      // Resolved output boundary used for zip-slip checks on every entry
+      const resolvedOutputDir = path.resolve(outputDirectory);
+
       // kick things off
       zipFile.readEntry();
 
       zipFile.on('entry', entry => {
+        // Null-byte poison check
+        if (entry.fileName.includes('\0')) {
+          return reject(new Error(`DBGM-00000 ZIP entry with null byte in filename rejected`));
+        }
+
         const destPath = path.join(outputDirectory, entry.fileName);
+        const resolvedDest = path.resolve(destPath);
+
+        // Zip-slip protection: every extracted path must stay inside outputDirectory
+        if (resolvedDest !== resolvedOutputDir && !resolvedDest.startsWith(resolvedOutputDir + path.sep)) {
+          return reject(
+            new Error(`DBGM-00000 ZIP slip detected: entry "${entry.fileName}" would escape output directory`)
+          );
+        }
 
         // Handle directories (their names always end with “/” in ZIPs)
         if (/\/$/.test(entry.fileName)) {
