@@ -55,13 +55,15 @@ logger.info('DBGM-00014 Finished job script');
 dbgateApi.runScript(run);
 `;
 
-const loaderScriptTemplate = (prefix, functionName, props, runid) => {
+const loaderScriptTemplate = (functionName, props, runid) => {
   assertValidShellApiFunctionName(functionName);
+  const plugins = extractShellApiPlugins(functionName, props);
+  const prefix = plugins.map(packageName => `// @require ${packageName}\n`).join('');
   return `
 ${prefix}
 const dbgateApi = require(process.env.DBGATE_API);
 dbgateApi.initializeApiEnvironment();
-${requirePluginsTemplate(extractShellApiPlugins(functionName, props))}
+${requirePluginsTemplate(plugins)}
 require=null;
 async function run() {
 const reader=await ${compileShellApiFunctionName(functionName)}(${JSON.stringify(props)});
@@ -381,14 +383,11 @@ module.exports = {
         return { errorMessage: 'DBGM-00289 Unallowed file' };
       }
     }
-    const prefix = extractShellApiPlugins(functionName)
-      .map(packageName => `// @require ${packageName}\n`)
-      .join('');
 
     const promise = new Promise((resolve, reject) => {
       const runid = crypto.randomUUID();
       this.requests[runid] = { resolve, reject, exitOnStreamError: true };
-      this.startCore(runid, loaderScriptTemplate(prefix, functionName, props, runid));
+      this.startCore(runid, loaderScriptTemplate(functionName, props, runid));
     });
     return promise;
   },
