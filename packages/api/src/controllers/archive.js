@@ -64,7 +64,7 @@ module.exports = {
   async createLink({ linkedFolder }) {
     assertSafeArchiveName(path.parse(linkedFolder).name, 'linkedFolder');
     const folder = await this.getNewArchiveFolder({ database: path.parse(linkedFolder).name + '.link' });
-    fs.writeFile(path.join(archivedir(), folder), linkedFolder);
+    await fs.writeFile(path.join(archivedir(), folder), linkedFolder);
     clearArchiveLinksCache();
     socket.emitChanged('archive-folders-changed');
     return folder;
