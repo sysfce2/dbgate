@@ -21,6 +21,7 @@ const JS_RESERVED_WORDS = new Set([
   'async', 'await',
   // Future reserved
   'enum',
+  'eval', 'arguments',
 ]);
 
 export function isValidJsIdentifier(name: string): boolean {
