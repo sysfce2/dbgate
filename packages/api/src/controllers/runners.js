@@ -56,7 +56,6 @@ dbgateApi.runScript(run);
 `;
 
 const loaderScriptTemplate = (functionName, props, runid) => {
-  assertValidShellApiFunctionName(functionName);
   const plugins = extractShellApiPlugins(functionName, props);
   const prefix = plugins.map(packageName => `// @require ${packageName}\n`).join('');
   return `
@@ -385,6 +384,7 @@ module.exports = {
     }
 
     const promise = new Promise((resolve, reject) => {
+      assertValidShellApiFunctionName(functionName);
       const runid = crypto.randomUUID();
       this.requests[runid] = { resolve, reject, exitOnStreamError: true };
       this.startCore(runid, loaderScriptTemplate(functionName, props, runid));
