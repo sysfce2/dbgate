@@ -32,6 +32,11 @@ function assertSafeArchiveName(name, label) {
   if (name.includes('\0') || name.includes('..') || name.includes('/') || name.includes('\\')) {
     throw new Error(`DBGM-00000 Invalid ${label}: path traversal not allowed`);
   }
+  // Reject names that resolve to the archive root itself (e.g. '.')
+  const resolved = path.resolve(archivedir(), name);
+  if (resolved === path.resolve(archivedir())) {
+    throw new Error(`DBGM-00000 Invalid ${label}: must not resolve to the archive root`);
+  }
 }
 
 module.exports = {
