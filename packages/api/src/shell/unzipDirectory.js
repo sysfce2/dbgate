@@ -16,23 +16,53 @@ function unzipDirectory(zipPath, outputDirectory) {
   return new Promise((resolve, reject) => {
     yauzl.open(zipPath, { lazyEntries: true }, (err, zipFile) => {
       if (err) return reject(err);
-
+      let settled = false;
+      /** Track active streams so we can destroy them on early abort */
+      const activeStreams = new Set();
+      const safeReject = rejectErr => {
+        if (settled) return;
+        settled = true;
+        for (const s of activeStreams) {
+          s.destroy();
+        }
+        activeStreams.clear();
+        zipFile.close();
+        reject(rejectErr);
+      };
       /** Pending per-file extractions – we resolve the main promise after they’re all done */
       const pending = [];
+
+      // Resolved output boundary used for zip-slip checks on every entry
+      const resolvedOutputDir = path.resolve(outputDirectory);
 
       // kick things off
       zipFile.readEntry();
 
       zipFile.on('entry', entry => {
+        // Null-byte poison check
+        if (entry.fileName.includes('\0')) {
+          return safeReject(new Error(`DBGM-00000 ZIP entry with null byte in filename rejected`));
+        }
+
         const destPath = path.join(outputDirectory, entry.fileName);
+        const resolvedDest = path.resolve(destPath);
+
+        // Zip-slip protection: every extracted path must stay inside outputDirectory
+        if (resolvedDest !== resolvedOutputDir && !resolvedDest.startsWith(resolvedOutputDir + path.sep)) {
+          return safeReject(
+            new Error(`DBGM-00000 ZIP slip detected: entry "${entry.fileName}" would escape output directory`)
+          );
+        }
 
         // Handle directories (their names always end with “/” in ZIPs)
         if (/\/$/.test(entry.fileName)) {
           // Ensure directory exists, then continue to next entry
           fs.promises
             .mkdir(destPath, { recursive: true })
-            .then(() => zipFile.readEntry())
-            .catch(reject);
+            .then(() => {
+              if (!settled) zipFile.readEntry();
+            })
+            .catch(safeReject);
           return;
         }
 
@@ -46,17 +76,29 @@ function unzipDirectory(zipPath, outputDirectory) {
                   if (err) return rej(err);
 
                   const writeStream = fs.createWriteStream(destPath);
+                  activeStreams.add(readStream);
+                  activeStreams.add(writeStream);
                   readStream.pipe(writeStream);
 
-                  // proceed to next entry once we’ve consumed *this* one
-                  readStream.on('end', () => zipFile.readEntry());
+                  // proceed to next entry once we've consumed *this* one
+                  readStream.on('end', () => {
+                    activeStreams.delete(readStream);
+                    if (!settled) zipFile.readEntry();
+                  });
+
+                  readStream.on('error', readErr => {
+                    activeStreams.delete(readStream);
+                    rej(readErr);
+                  });
 
                   writeStream.on('finish', () => {
+                    activeStreams.delete(writeStream);
                     logger.info(`DBGM-00068 Extracted "${entry.fileName}" → "${destPath}".`);
                     res();
                   });
 
                   writeStream.on('error', writeErr => {
+                    activeStreams.delete(writeStream);
                     logger.error(
                       extractErrorLogData(writeErr),
                       `DBGM-00069 Error extracting "${entry.fileName}" from "${zipPath}".`
@@ -67,22 +109,29 @@ function unzipDirectory(zipPath, outputDirectory) {
               })
           );
 
+        // Immediately abort the whole unzip if this file fails; otherwise the
+        // zip would never emit 'end' (lazyEntries won't advance without readEntry).
+        filePromise.catch(safeReject);
         pending.push(filePromise);
       });
 
       // Entire archive enumerated; wait for all streams to finish
       zipFile.on('end', () => {
+        if (settled) return;
         Promise.all(pending)
           .then(() => {
+            if (settled) return;
+            settled = true;
+            zipFile.close();
             logger.info(`DBGM-00070 Archive "${zipPath}" fully extracted to "${outputDirectory}".`);
             resolve(true);
           })
-          .catch(reject);
+          .catch(safeReject);
       });
 
       zipFile.on('error', err => {
         logger.error(extractErrorLogData(err), `DBGM-00071 ZIP file error in ${zipPath}.`);
-        reject(err);
+        safeReject(err);
       });
     });
   });
