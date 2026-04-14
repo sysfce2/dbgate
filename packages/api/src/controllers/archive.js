@@ -279,11 +279,18 @@ module.exports = {
   async saveRows({ folder, file, rows }) {
     assertSafeArchiveName(folder, 'folder');
     assertSafeArchiveName(file, 'file');
-    const fileStream = fs.createWriteStream(path.join(resolveArchiveFolder(folder), `${file}.jsonl`));
+    const filePath = path.join(resolveArchiveFolder(folder), `${file}.jsonl`);
+    const fileStream = fs.createWriteStream(filePath);
     for (const row of rows) {
-      await fileStream.write(JSON.stringify(row) + '\n');
+      const ok = fileStream.write(JSON.stringify(row) + '\n');
+      if (!ok) {
+        await new Promise(resolve => fileStream.once('drain', resolve));
+      }
     }
-    await fileStream.close();
+    await new Promise((resolve, reject) => {
+      fileStream.end(() => resolve());
+      fileStream.on('error', reject);
+    });
     socket.emitChanged(`archive-files-changed`, { folder });
     return true;
   },
