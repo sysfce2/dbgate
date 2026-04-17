@@ -109,19 +109,21 @@ export function parseCellValue(value, editorTypes?: DataEditorTypesBehaviour) {
   }
 
   if (editorTypes?.parseHexAsBuffer) {
-    const mUuid3 = value.match(uuid3WrapperRegex);
-    if (mUuid3) {
-      const base64Uuid3 = uuidToBase64(mUuid3[1]);
-      if (base64Uuid3 != null) return { $binary: { base64: base64Uuid3, subType: '03' } };
-    }
-    const mUuid4 = value.match(uuid4WrapperRegex);
-    if (mUuid4) {
-      const base64Uuid4 = uuidToBase64(mUuid4[1]);
-      if (base64Uuid4 != null) return { $binary: { base64: base64Uuid4, subType: '04' } };
-    }
-    if (uuidRegex.test(value)) {
-      const base64UuidPlain = uuidToBase64(value);
-      if (base64UuidPlain != null) return { $binary: { base64: base64UuidPlain, subType: '04' } };
+    if (editorTypes?.parseUuid){
+        const mUuid3 = value.match(uuid3WrapperRegex);
+      if (mUuid3) {
+        const base64Uuid3 = uuidToBase64(mUuid3[1]);
+        if (base64Uuid3 != null) return { $binary: { base64: base64Uuid3, subType: '03' } };
+      }
+      const mUuid4 = value.match(uuid4WrapperRegex);
+      if (mUuid4) {
+        const base64Uuid4 = uuidToBase64(mUuid4[1]);
+        if (base64Uuid4 != null) return { $binary: { base64: base64Uuid4, subType: '04' } };
+      }
+      if (uuidRegex.test(value)) {
+        const base64UuidPlain = uuidToBase64(value);
+        if (base64UuidPlain != null) return { $binary: { base64: base64UuidPlain, subType: '04' } };
+      }
     }
     const mHex = value.match(/^0x([0-9a-fA-F][0-9a-fA-F])+$/);
     if (mHex) {
