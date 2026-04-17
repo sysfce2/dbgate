@@ -37,4 +37,12 @@ module.exports = {
   async getUsedEngines() {
     return null;
   },
+
+  async readQueryHistory({ skip, limit, filter }) {
+    return null;
+  },
+
+  async writeQueryHistory({ data }) {
+    return null;
+  },
 };
