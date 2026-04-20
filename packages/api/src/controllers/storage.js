@@ -38,11 +38,11 @@ module.exports = {
     return null;
   },
 
-  async readQueryHistory({ skip, limit, filter }) {
+  async readQueryHistory({ skip, limit, filter }, req) {
     return null;
   },
 
-  async writeQueryHistory({ data }) {
+  async writeQueryHistory({ data }, req) {
     return null;
   },
 };
