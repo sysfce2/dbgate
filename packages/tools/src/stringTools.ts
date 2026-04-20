@@ -327,19 +327,23 @@ export function stringifyCellValue(
 
   if (value?.$binary?.base64) {
     const subType = value.$binary.subType;
-    const uuidStr = base64ToUuid(value.$binary.base64);
-    if (uuidStr != null) {
-      if (intent === 'gridCellIntent' || intent === 'exportIntent' || intent === 'clipboardIntent' || intent === 'stringConversionIntent') {
+    // Render as UUID only when the subType explicitly marks this as a UUID (03/04),
+    // or when the driver signals that binary values may represent UUIDs (parseUuid).
+    // Without this guard, any 16-byte binary (e.g. MD5 hashes) would be misrepresented as UUIDs.
+    const isUuidSubType = subType === '03' || subType === '04';
+    if (isUuidSubType || editorTypes?.parseUuid) {
+      const uuidStr = base64ToUuid(value.$binary.base64);
+      if (uuidStr != null) {
+        if (intent === 'gridCellIntent' || intent === 'exportIntent' || intent === 'clipboardIntent' || intent === 'stringConversionIntent') {
+          return { value: uuidStr, gridStyle: 'valueCellStyle' };
+        }
+        // For editing intents in MongoDB: use UUID() wrapper for round-tripping via parseCellValue
+        if (editorTypes?.parseUuid) {
+          const tag = subType === '03' ? 'UUID3' : 'UUID';
+          return { value: `${tag}("${uuidStr}")`, gridStyle: 'valueCellStyle' };
+        }
         return { value: uuidStr, gridStyle: 'valueCellStyle' };
       }
-      // For editing intents in MongoDB: use UUID() wrapper for round-tripping via parseCellValue
-      if (editorTypes?.parseUuid) {
-        const tag = subType === '03' ? 'UUID3' : 'UUID';
-        return { value: `${tag}("${uuidStr}")`, gridStyle: 'valueCellStyle' };
-      }
-      // For editing intents in SQL databases: show plain UUID string
-      // The SQL dumper's putValue handles UUID-to-binary conversion based on column dataType
-      return { value: uuidStr, gridStyle: 'valueCellStyle' };
     }
     if (intent === 'gridCellIntent' && value.$binary.base64.length > MAX_GRID_BINARY_SIZE) {
       return { value: `(Field too large, ${formatByteSize(Math.round(value.$binary.base64.length * 3 / 4))})`, gridStyle: 'nullCellStyle' };
