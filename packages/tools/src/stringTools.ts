@@ -109,8 +109,8 @@ export function parseCellValue(value, editorTypes?: DataEditorTypesBehaviour) {
   }
 
   if (editorTypes?.parseHexAsBuffer) {
-    if (editorTypes?.parseUuid){
-        const mUuid3 = value.match(uuid3WrapperRegex);
+    if (editorTypes?.parseUuid) {
+      const mUuid3 = value.match(uuid3WrapperRegex);
       if (mUuid3) {
         const base64Uuid3 = uuidToBase64(mUuid3[1]);
         if (base64Uuid3 != null) return { $binary: { base64: base64Uuid3, subType: '03' } };
@@ -327,16 +327,19 @@ export function stringifyCellValue(
 
   if (value?.$binary?.base64) {
     const subType = value.$binary.subType;
-    if (subType === '03' || subType === '04') {
-      const uuidStr = base64ToUuid(value.$binary.base64);
-      if (uuidStr != null) {
-        if (intent === 'gridCellIntent' || intent === 'exportIntent' || intent === 'clipboardIntent' || intent === 'stringConversionIntent') {
-          return { value: uuidStr, gridStyle: 'valueCellStyle' };
-        }
-        // For editing intents: tag with subType so parseCellValue can round-trip it
+    const uuidStr = base64ToUuid(value.$binary.base64);
+    if (uuidStr != null) {
+      if (intent === 'gridCellIntent' || intent === 'exportIntent' || intent === 'clipboardIntent' || intent === 'stringConversionIntent') {
+        return { value: uuidStr, gridStyle: 'valueCellStyle' };
+      }
+      // For editing intents in MongoDB: use UUID() wrapper for round-tripping via parseCellValue
+      if (editorTypes?.parseUuid) {
         const tag = subType === '03' ? 'UUID3' : 'UUID';
         return { value: `${tag}("${uuidStr}")`, gridStyle: 'valueCellStyle' };
       }
+      // For editing intents in SQL databases: show plain UUID string
+      // The SQL dumper's putValue handles UUID-to-binary conversion based on column dataType
+      return { value: uuidStr, gridStyle: 'valueCellStyle' };
     }
     if (intent === 'gridCellIntent' && value.$binary.base64.length > MAX_GRID_BINARY_SIZE) {
       return { value: `(Field too large, ${formatByteSize(Math.round(value.$binary.base64.length * 3 / 4))})`, gridStyle: 'nullCellStyle' };
