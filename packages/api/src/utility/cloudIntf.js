@@ -37,6 +37,10 @@ const DBGATE_CLOUD_URL = process.env.LOCAL_DBGATE_CLOUD
   ? 'https://cloud.dbgate.udolni.net'
   : 'https://cloud.dbgate.io';
 
+
+const DBGATE_PUBLIC_CLOUD_URL =
+  DBGATE_CLOUD_URL === 'https://cloud.dbgate.io' ? 'https://api.dbgate.cloud' : DBGATE_CLOUD_URL;
+
 const stageAxiosConfig =
   !process.env.PROD_DBGATE_CLOUD && (process.env.DEVWEB || process.env.DEVMODE)
     ? { httpsAgent: new https.Agent({ rejectUnauthorized: false }) }
@@ -220,9 +224,9 @@ async function updateCloudFiles(isRefresh, language) {
   logger.info({ tags, lastCheckedTm }, 'DBGM-00082 Downloading cloud files');
 
   const resp = await axios.default.get(
-    `${DBGATE_CLOUD_URL}/public-cloud-updates?lastCheckedTm=${lastCheckedTm}&tags=${tags}&isRefresh=${
+    `${DBGATE_PUBLIC_CLOUD_URL}/public-cloud-updates?lastCheckedTm=${lastCheckedTm}&tags=${tags}&isRefresh=${
       isRefresh ? 1 : 0
-    }`,
+    }}`,
     {
       headers: {
         ...getLicenseHttpHeaders(),
@@ -265,7 +269,7 @@ async function getPublicCloudFiles() {
 }
 
 async function getPublicFileData(path) {
-  const resp = await axios.default.get(`${DBGATE_CLOUD_URL}/public/${path}`, {
+  const resp = await axios.default.get(`${DBGATE_PUBLIC_CLOUD_URL}/public/${path}`, {
     headers: {
       ...getLicenseHttpHeaders(),
     },
