@@ -9,6 +9,13 @@ Builds:
 - linux - application for linux
 - win - application for Windows
 
+## 7.1.9
+
+- FIXED: writeQueryHistory function error #1432
+- FIXED: UUID parsing issues #1434, #1431
+- ADDED: Validation for function and file names, fixed security issues
+- CHANGED: Public DbGate cloud migrated; endpoints now on new infrastructure, improving availability
+
 ## 7.1.8
 
 - FIXED: NPM packages build
