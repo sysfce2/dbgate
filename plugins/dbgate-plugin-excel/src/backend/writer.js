@@ -39,7 +39,8 @@ class ExcelSheetWriterStream extends stream.Writable {
 
   _final(callback) {
     const workbook = createWorkbook(this.fileName);
-    xlsx.utils.book_append_sheet(workbook, xlsx.utils.aoa_to_sheet(this.rows), this.sheetName || 'Sheet 1');
+    const sheetName = (this.sheetName || 'Sheet 1').substring(0, 31);
+    xlsx.utils.book_append_sheet(workbook, xlsx.utils.aoa_to_sheet(this.rows), sheetName);
     callback();
   }
 }
