@@ -1,6 +1,7 @@
 const xlsx = require('xlsx');
 const stream = require('stream');
 
+const MAX_SHEET_NAME_LENGTH = 31;
 const writingWorkbooks = {};
 
 async function saveExcelFiles() {
@@ -39,13 +40,13 @@ class ExcelSheetWriterStream extends stream.Writable {
 
   _final(callback) {
     const workbook = createWorkbook(this.fileName);
-    const base = (this.sheetName || 'Sheet 1').substring(0, 31);
+    const base = (this.sheetName || 'Sheet 1').substring(0, MAX_SHEET_NAME_LENGTH);
     let sheetName = base;
     if (workbook.SheetNames.includes(sheetName)) {
       let counter = 1;
       do {
         const suffix = `_${counter}`;
-        sheetName = base.substring(0, 31 - suffix.length) + suffix;
+        sheetName = base.substring(0, MAX_SHEET_NAME_LENGTH - suffix.length) + suffix;
         counter++;
       } while (workbook.SheetNames.includes(sheetName));
     }
