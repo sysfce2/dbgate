@@ -39,7 +39,16 @@ class ExcelSheetWriterStream extends stream.Writable {
 
   _final(callback) {
     const workbook = createWorkbook(this.fileName);
-    const sheetName = (this.sheetName || 'Sheet 1').substring(0, 31);
+    const base = (this.sheetName || 'Sheet 1').substring(0, 31);
+    let sheetName = base;
+    if (workbook.SheetNames.includes(sheetName)) {
+      let counter = 1;
+      do {
+        const suffix = `_${counter}`;
+        sheetName = base.substring(0, 31 - suffix.length) + suffix;
+        counter++;
+      } while (workbook.SheetNames.includes(sheetName));
+    }
     xlsx.utils.book_append_sheet(workbook, xlsx.utils.aoa_to_sheet(this.rows), sheetName);
     callback();
   }
