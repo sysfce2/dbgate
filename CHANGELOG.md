@@ -9,6 +9,13 @@ Builds:
 - linux - application for linux
 - win - application for Windows
 
+## 7.1.10
+
+- CHANGED: Private DbGate cloud migrated; endpoints now on new infrastructure, improving availability
+- CHANGED: DbGate Identity migrated, improving availability; requires upgrading to the new version; not backward compatible
+- FIXED: Excel export now correctly handles long table names #1441
+- FIXED: Sometimes SQL file is saved to incorrect team folder (Team Premium)
+
 ## 7.1.9
 
 - FIXED: writeQueryHistory function error #1432
