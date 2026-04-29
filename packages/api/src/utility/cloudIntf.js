@@ -24,10 +24,10 @@ let promoWidgetDataLoaded = false;
 const DBGATE_IDENTITY_URL = process.env.LOCAL_DBGATE_IDENTITY
   ? 'http://localhost:3103'
   : process.env.PROD_DBGATE_IDENTITY
-  ? 'https://identity.dbgate.io'
+  ? 'https://identity.dbgate.cloud'
   : process.env.DEVWEB || process.env.DEVMODE
   ? 'https://identity.dbgate.udolni.net'
-  : 'https://identity.dbgate.io';
+  : 'https://identity.dbgate.cloud';
 
 const DBGATE_CLOUD_URL = process.env.LOCAL_DBGATE_CLOUD
   ? 'http://localhost:3110'
@@ -346,7 +346,7 @@ async function callCloudApiGet(endpoint, signinHolder = null, additionalHeaders 
   }
   const signinHeaders = await getCloudSigninHeaders(signinHolder);
 
-  const resp = await axios.default.get(`${DBGATE_CLOUD_URL}/${endpoint}`, {
+  const resp = await axios.default.get(`${DBGATE_PUBLIC_CLOUD_URL}/${endpoint}`, {
     headers: {
       ...getLicenseHttpHeaders(),
       ...signinHeaders,
@@ -386,7 +386,7 @@ async function callCloudApiPost(endpoint, body, signinHolder = null) {
   }
   const signinHeaders = await getCloudSigninHeaders(signinHolder);
 
-  const resp = await axios.default.post(`${DBGATE_CLOUD_URL}/${endpoint}`, body, {
+  const resp = await axios.default.post(`${DBGATE_PUBLIC_CLOUD_URL}/${endpoint}`, body, {
     headers: {
       ...getLicenseHttpHeaders(),
       ...signinHeaders,
@@ -491,7 +491,7 @@ function removeCloudCachedConnection(folid, cntid) {
 
 async function getPublicIpInfo() {
   try {
-    const resp = await axios.default.get(`${DBGATE_CLOUD_URL}/ipinfo`, stageAxiosConfig);
+    const resp = await axios.default.get(`${DBGATE_PUBLIC_CLOUD_URL}/ipinfo`, stageAxiosConfig);
     if (!resp.data?.ip) {
       return { ip: 'unknown-ip' };
     }
