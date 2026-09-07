@@ -1,7 +1,10 @@
 // @ts-check
 
 const _ = require('lodash');
+const { getLogger } = global.DBGATE_PACKAGES['dbgate-tools'];
 const { CloudflareD1Error, D1_ERROR_KIND } = require('./CloudflareD1Error');
+
+const logger = getLogger('sqliteDriver');
 
 /**
  * Schema loading over the Cloudflare D1 REST API.
@@ -12,8 +15,8 @@ const { CloudflareD1Error, D1_ERROR_KIND } = require('./CloudflareD1Error');
  * statements in one `batch` request, so all schema PRAGMAs are collected first and then sent
  * together, which reduces a full analysis to a handful of requests.
  *
- * Only read-only statements may be passed through the helpers below - a failed batch is retried
- * statement by statement, which would repeat side effects of a write.
+ * Only read-only statements may be passed through the helpers below - a statement level batch
+ * failure is retried statement by statement, which would repeat side effects of a write.
  */
 
 /**
@@ -100,6 +103,20 @@ async function queryD1Batch(client, sqlItems) {
 }
 
 /**
+ * Failures which a single statement can be responsible for, and which therefore may be worth
+ * retrying without batching. Every other kind - an invalid token, a missing account or database,
+ * a network problem, a malformed response - is a property of the connection, not of one
+ * statement: retrying it per statement would multiply the failing requests (risking a rate
+ * limit) without any chance of recovering.
+ */
+const D1_STATEMENT_ERROR_KINDS = [D1_ERROR_KIND.sqlError, D1_ERROR_KIND.unsupported];
+
+/** @param {any} err */
+function isD1StatementError(err) {
+  return err instanceof CloudflareD1Error && D1_STATEMENT_ERROR_KINDS.includes(err.kind);
+}
+
+/**
  * @param {{ query: (sql: string) => Promise<any>, executeStatements: (statements: { sql: string }[]) => Promise<any[]> }} client
  * @param {string[]} chunk
  */
@@ -116,9 +133,17 @@ async function executeReadOnlyChunk(client, chunk) {
     }
     return results;
   } catch (err) {
-    // D1 fails a batch as a whole, so one rejected PRAGMA would otherwise break the whole
-    // analysis. Retrying one statement per request is slow but keeps the behaviour of the
-    // unbatched loader, including which statement the reported error belongs to.
+    if (!isD1StatementError(err)) {
+      throw err;
+    }
+    // D1 rejects a batch as a whole, so a statement level error hides which statement caused it,
+    // and a batch refused only because of its batching would take the whole analysis down with
+    // it. Both are recoverable by asking one statement per request: the analysis either succeeds,
+    // or fails with the error of the statement actually responsible for it.
+    logger.debug(
+      { statements: chunk.length, errorMessage: err.message },
+      'DBGM-00000 Cloudflare D1 batch failed, retrying one statement per request'
+    );
     const results = [];
     for (const sql of chunk) {
       results.push(await client.query(sql));
@@ -269,6 +294,7 @@ module.exports = {
   D1_MAX_BATCH_STATEMENTS,
   collectD1IndexNames,
   filterD1InternalRows,
+  isD1StatementError,
   foreignKeyListKey,
   indexInfoKey,
   indexListKey,
