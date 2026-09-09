@@ -288,7 +288,7 @@ module.exports = {
         {
           "pureName": "auth_methods_config",
           "columnName": "value",
-          "dataType": "varchar(250)",
+          "dataType": "text",
           "notNull": false
         }
       ],
@@ -2479,7 +2479,7 @@ module.exports = {
         },
         {
           "pureName": "user_roles",
-          "columnName": "oauth_amoid",
+          "columnName": "auth_method_amoid",
           "dataType": "varchar(250)",
           "notNull": false
         }
